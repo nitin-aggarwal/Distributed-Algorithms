@@ -1,0 +1,60 @@
+# Driver program for Ricart-Agrawala's token-based distributed mutual exclusion algorithm
+
+# Include the source file (like a macro)
+dist_source("Ricart_Agrawala.dis")
+
+def main():
+	# Input received from commandLine for processes and requests
+	if len(sys.argv) > 1:
+		try:
+			numProcesses = int(sys.argv[1])
+		except:
+			print("Correct usage: python -m distalgo.runtime RAToken.dis args1 args2 where args1, args2 should be positive integers")
+			sys.exit(1)
+	else:	
+		numProcesses = 2
+	
+	if numProcesses < 1:
+		print("Invalid: Number of processes should be atleast 1")
+		sys.exit(1)
+
+	if len(sys.argv) > 2:
+		try:
+			numRequests = int(sys.argv[2])
+		except:
+			print("Correct usage: python -m distalgo.runtime RAToken.dis args1 args2 where args1, args2 should be positive integers")
+			sys.exit(1)
+	else:	
+		numRequests = 5
+
+	if numRequests < 0:
+		print("Invalid: Number of requests should be positive")
+		sys.exit(1)
+	
+	if len(sys.argv) > 3:
+		print("Correct usage: python -m distalgo.runtime RAToken.dis args1 args2 where args1, args2 should be positive integers")
+		sys.exit(1)
+	
+	# Dictionary for Process and requests mapping
+	processRequests = dict((proc, []) for proc in range(1, numProcesses+1))
+
+        # List for all the requests
+	requestsList = list(range(1, numRequests + 1))
+
+	# Re-order the list.
+	random.shuffle(requestsList)
+	for request in range(len(requestsList)):
+		requestId = requestsList.pop()
+		processRequests[request % numProcesses + 1].append(requestId)
+
+        # Creating the processes and call setup function for RAToken class       
+	processList = list(createprocs(RAToken, numProcesses))
+	
+	# Run appropriate setup functions
+	count = 0
+	for count, proc in enumerate(processList):
+		setupprocs({proc}, [(processList[count+1:] + processList[0:count+1]), processList[count], processRequests[count+1], True if count == 0 else False])
+
+	print("Running Ricart-Agrawala's token-based algorithm for distributed mutual exclusion")
+	# Start the processes
+	startprocs(processList)

@@ -1,0 +1,87 @@
+# Suzuki-Kasami's Token-based Distributed Memory Mutual Exclusion Algorithm
+
+# Import the required modules
+import random
+import sys
+
+# SKToken class for Suzuki-Kasami's token algorithm
+class SKToken(DistProcess):
+	
+	def task():
+		return
+
+	def setup(processes, Id, requests, tokenFlag):		
+		# Indicates currently processed request
+		requestId = 0;
+
+		# Hold all the pending out of order requests
+		pending = []
+
+		processId = Id		
+		processList = processes         
+		requestList = requests
+		
+		token_present = False		
+		token_requested = False
+		
+		requestIssued = dict((proc, 0) for proc in processList)
+		requestServed = dict((proc, 0)  for proc in processList)
+		
+		# Ensures initially 1 process gets the token		
+		if tokenFlag:
+			token_present = True
+
+	def OnRequest(requests):
+		requestIssued[_source] = max(requestIssued[_source], requests)
+		if token_present == True and token_requested == False and requestIssued[_source] == requestServed[_source]+1:
+			token_present = False
+			output(str(processId) + " sending token to " + str(_source))
+			send(Token(pending,requestServed),_source)
+		
+	def CS(task):
+		--start		
+		--request
+		token_requested = True
+
+		# Request token from all other processes
+		if token_present == False:
+			output("PID: "+str(processId)+" Request: "+str(requestId)+" requesting token for CS" )
+			requestIssued[self] = requestIssued[self] + 1
+			for proc in processList:
+                		send(Request(requestIssued[self]), [proc])
+			--await
+			await(token_present == True)
+
+		
+		output("PID: " + str(processId) + " Request: "+str(requestId)+" entering CS")
+		--cs
+		task()
+		requestServed[self] = requestServed[self] + 1
+		output("PID: " + str(processId) + " Request: "+str(requestId)+" releasing CS")
+		
+		--release
+		release()
+		--end
+
+	def release():
+		token_requested = False
+		# Find the next process which needs this token
+		[pending.append(proc) for proc in processList  if not(proc in pending) and requestIssued[proc] == requestServed[proc]+1]
+			
+		if len(pending) > 0:
+			token_present = False
+			newProc = pending.pop()
+			output(str(processId) + " sending token to " + str(newProc))
+			send(Token(pending, requestServed), newProc)
+		pending = []
+
+	def OnToken(pendingRequests, tokenAssign):
+		token_present = True
+		pending = pendingRequests
+		requestServed = tokenAssign
+
+	def main():
+		while len(requestList):
+			requestId = requestList.pop()
+			CS(task)
+		await(token_present == False)

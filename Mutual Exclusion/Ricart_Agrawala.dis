@@ -1,0 +1,86 @@
+# Ricart-Agrawala's Token-based Distributed Memory Mutual Exclusion Algorithm
+
+# Import the required modules
+import sys
+import random
+
+# RAToken class for Ricart-Agrawala's token algorithm
+class RAToken(DistProcess):
+
+	def task():
+		return
+
+	def setup(processes, Id, requests, tokenFlag):	
+		#Indicates currently processed request
+		requestId = 0;
+
+		processId = Id		
+		processList = processes         
+		requestList = requests
+		
+		timestamp = 0
+		token_present = False		
+		token_held = False
+		
+		tokenRequested = dict((proc, 0) for proc in processList)
+		tokenAssigned = dict((proc, 0)  for proc in processList)
+		
+		if tokenFlag:
+			token_present = True
+
+	def OnRequest(timestamp):
+		# Update the tokenRequested value for the source process
+		tokenRequested[_source] = max(tokenRequested[_source], timestamp)
+
+		if token_present == True and not token_held:
+			for process in [ proc for proc in processList if tokenRequested[proc] > tokenAssigned[proc] ]:
+				token_present = False
+				output(str(processId) + " send token to " + str(process) )
+				tokenAssigned[_source] = timestamp
+				send(Token(tokenAssigned), process)
+				break
+
+	def CS(task):
+		--start
+		timestamp = timestamp + 1
+
+		# Request token from all other processes
+		if token_present == False:
+			output("PID: "+str(processId)+" Timestamp: "+str(timestamp)+" Request: "+str(requestId)+" requesting token for CS" )
+			for proc in processList:
+                		send(Request(timestamp), [proc])
+			--await
+			await(token_present == True)
+
+		token_held = True
+		output("PID: " + str(processId) + " Timestamp: " + str(timestamp) +" Request: "+str(requestId)+" entering CS")
+		--cs
+		task()
+		output("PID: " + str(processId) + " Timestamp: " + str(timestamp) +" Request: "+str(requestId)+" releasing CS")
+		
+		--reply
+		--release
+		release()
+		--end
+
+	def release():
+		tokenAssigned[self] = timestamp
+		token_held = False
+
+		# Find the next process which needs this token
+		for proc in [ x for x in processList if tokenRequested[x] > tokenAssigned[x] ]:
+			token_present = False
+			output(str(processId) + " sending token to " + str(proc))
+			send(Token(tokenAssigned), proc)
+			break
+
+	def OnToken(tokenAssign):
+		token_present = True
+		tokenAssigned = tokenAssign
+		tokenAssigned[self] = timestamp
+	
+	def main():
+		while len(requestList):
+			requestId = requestList.pop()
+			CS(task)
+		await(token_present == False)
